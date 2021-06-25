@@ -1,0 +1,119 @@
+#define BUF_SIZE 1024
+#define MAX_LOGIN 1
+
+#####/proc/*/   에서 프로세스 넘버만 가져오는 함수
+int get_pid(char *s)
+{
+	int len, i;
+	
+	len = strlen(s);
+	for(i=0;i<len;i++)
+	{
+	  if((s[i] < '0' || s[i] > '9'))
+		{
+			return -1;
+		}
+	}
+	return atoi(s);
+}
+
+#####프로세스로 lsh가 켜져있는지 아닌지 확인
+int check_logon(char* ip_addr)
+{
+	DIR *dp;
+	struct dirent *dir;
+	char buf[BUF_SIZE], line[BUF_SIZE], tag[BUF_SIZE], name[BUF_SIZE], log[BUF_SIZE];
+	char program_name[BUF_SIZE] = "lsh";
+	int pid;
+	int logon_count = 0;
+	FILE *fp;
+	time_t now;
+	char *cur_time;
+
+	dp = opendir("/proc");
+	if(!dp)
+	{
+		return -1;
+	}
+	
+	
+	while((dir = readdir(dp)) != NULL)
+	{
+		pid = get_pid(dir->d_name);
+
+		if(pid == -1)
+		{
+			continue;
+		}
+
+		snprintf(buf, 100, "/proc/%d/status", pid);
+		fp = fopen(buf, "r");
+		if(fp == NULL)
+		{
+			continue;
+		}
+
+		fgets(line, BUF_SIZE, fp);
+		fclose(fp);
+		sscanf(line, "%s %s", tag, name);
+		
+		if(strcmp(name, program_name) == 0)
+		{
+			logon_count += 1;
+			if(logon_count == MAX_LOGIN + 1)
+			{
+				printf("이미실행중입니다.\n");
+				time(&now);
+				cur_time = ctime(&now);
+				cur_time[strlen(cur_time)-1]='\0';
+				sprintf(log, "%s FULL LOGIN %s\n", cur_time, ip_addr);
+				store_failed_log(log);
+				return 1;
+			}
+		}
+	}
+	closedir(dp);
+	return 0;
+}
+
+#####로그인실패시 failed_log에 저장 
+#####ip리스트에없어서 실패던 이미 lsh가 켜져있던 로그인 id pw가 틀려 로그인실패이던 이 함수로 로그 저장
+void store_failed_log(char* log)
+{
+	FILE *fp;
+	fp = fopen("failed_log", "a");
+
+	if(fp == NULL)
+	{
+		printf("error! failed to write log\n");
+		exit(0);
+	}
+
+	fwrite(log, strlen(log), 1, fp);
+}
+
+
+
+##### 메인에 추가할 코드
+int main(int argc, char **argv)
+{
+
+	int check_result, IP_result;
+	char* s = getenv("SSH_CLIENT");
+	char CLIENT_IP[BUF_SIZE], CLIENT_PORT[BUF_SIZE], SERVER_PORT[BUF_SIZE];
+	
+	sscanf(s, "%s %s %s", CLIENT_IP, CLIENT_PORT, SERVER_PORT);
+
+
+	check_result = check_logon(CLIENT_IP);
+	if(check_result == 1)
+	{
+		exit(0);
+	}
+
+}
+
+
+##### 메인에서 불러올 함수 순서
+
+white_list -> check_login -> login

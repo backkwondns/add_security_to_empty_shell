@@ -1,0 +1,98 @@
+#####window에 있는 getch 함수를 리눅스에서 쓸수있게하는 코드
+#####getch로 해야 pw입력할때 화면에 입력한 데이터가 안보임
+int getch(void)
+{
+	int ch;							 
+	struct termios buf;
+	struct termios save;
+
+	tcgetattr(0, &save);
+	buf = save;
+	buf.c_lflag &= ~(ICANON|ECHO);
+	buf.c_cc[VMIN] = 1;
+	buf.c_cc[VTIME] = 0;
+	tcsetattr(0, TCSAFLUSH, &buf);
+	ch = getchar();	
+	tcsetattr(0, TCSAFLUSH, &save);
+	return ch;
+}
+
+
+void login(char* ip_addr)
+{
+	FILE *fp;
+	char data_account[BUF_SIZE], data_id[BUF_SIZE * 2], data_pw[BUF_SIZE * 2];
+	char input_id[BUF_SIZE], input_pw[BUF_SIZE*2], enc_str_pw[BUF_SIZE*2], log[BUF_SIZE], single_pw;
+	int i, n;
+	char *cur_time;
+	time_t now;
+
+	fp = fopen("data", "r");	
+	fgets(data_account, BUF_SIZE, fp);
+	fclose(fp);
+	sscanf(data_account, "%s : %s", data_id, data_pw);
+	
+	printf("ID : ");
+	fgets(input_id, sizeof(input_id), stdin);
+	input_id[strlen(input_id)-1]='\0'; //개행문자제거
+	printf("PW : ");
+	
+	for(i=0; i<11; i++)
+	{
+		single_pw = getch();
+		if((int)single_pw == 10)
+		{
+			break;
+		}
+		input_pw[i] = single_pw;
+	}
+
+	int enc_pw[strlen(input_pw)*2];
+
+	for(i=0;i<strlen(input_pw);i++)
+	{
+		enc_pw[2*i] = (input_pw[i]-1);
+		enc_pw[2*i+1] = 46-1;
+	}
+
+	for(i = 0;i<sizeof(enc_pw)/sizeof(int);i++)
+	{
+		sprintf(enc_str_pw, "%s%d", enc_str_pw, enc_pw[i]);
+	}
+	
+	if((strcmp(data_id, input_id)) == 0 && (strcmp(data_pw, enc_str_pw)) == 0)
+	{
+		printf("\n로그인완료\n");
+		time(&now);
+		cur_time = ctime(&now);
+		cur_time[strlen(cur_time)-1]='\0';
+		sprintf(log, "%s Login at %s\n", cur_time, ip_addr);
+		printf("%s", log);
+		store_login_log(log);
+	}
+	else
+	{
+		printf("\n로그인실패\n");
+		time(&now);
+		cur_time = ctime(&now);
+		cur_time[strlen(cur_time)-1]='\0';
+		sprintf(log, "%s Login failed at %s\n", cur_time, ip_addr);
+		store_failed_log(log);
+		exit(0);
+	}
+}
+
+#####로그인 성공시 login_log파일에 저장
+void store_login_log(char* log)
+{
+	FILE *fp;
+	fp = fopen("login_log", "a");
+	
+	if(fp == NULL)
+	{
+		printf("error! failed to write log\n");
+		exit(0);
+	}
+
+	fwrite(log, strlen(log), 1,fp);
+}

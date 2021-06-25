@@ -1,0 +1,54 @@
+
+#####IP 차단 리스트 불러와서 현재접속 IP와 비교 후 매칭없으면 차단
+int white_list(char* ip_addr)
+{
+	FILE *fp;
+	char list_ip[BUF_SIZE][BUF_SIZE];
+	char log[BUF_SIZE];
+	char *cur_time;
+	time_t now;
+	int i, lines;
+
+	fp = fopen("list", "r");
+	
+	if(fp == NULL)
+	{
+		printf("error! block all IP\n");
+		exit(0);
+	}
+
+	i = 0;
+
+	while(fgets(list_ip[i], BUF_SIZE, fp))
+	{
+		list_ip[i][strlen(list_ip[i]) - 1] = '\0';
+		i++;
+	}
+
+
+	for (int lines=0;lines<i;lines++)
+	{
+		if(strcmp(list_ip[lines], ip_addr) == 0)
+		{
+			return 0;
+		}
+	}
+  	printf("NOT ALLOWED IP\n");
+	
+	time(&now);
+	cur_time = ctime(&now);
+	cur_time[strlen(cur_time)-1]='\0';
+	sprintf(log, "%s NOT ALLOWED IP %s\n", cur_time, ip_addr);
+	store_failed_log(log);
+	return 1;
+}
+
+
+
+#####main에 추가
+	IP_result = white_list(CLIENT_IP);
+	if(IP_result ==1)
+	{
+		exit(0);
+	}
+
